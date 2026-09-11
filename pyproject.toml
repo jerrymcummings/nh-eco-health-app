@@ -1,0 +1,23 @@
+[project]
+name = "nh-eco-health-app"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi>=0.141.1",
+    "langchain-community>=0.4.2",
+    "langchain-openai>=1.6.2",
+    "pandas>=3.0.5",
+    "plotly>=7.0.0",
+    "requests>=2.32.0",
+    "streamlit>=1.63.0",
+    "uvicorn>=0.52.4",
+]
+
+[project.scripts]
+nh-eco-health-app = "nh_eco_health_app:main"
+
+[build-system]
+requires = ["uv_build>=0.12.5,<0.13.0"]
+build-backend = "uv_build"
