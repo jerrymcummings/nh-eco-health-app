@@ -1,3 +1,6 @@
+
+# uv run python src/backend/seed_usgs_wells.py
+
 import os
 import re
 import sqlite3
@@ -71,28 +74,18 @@ def execute_sqlite_query(query: str):
 
 
 @app.post("/api/query")
-def generate_and_execute_query(request: QueryRequest):
-    """Generate and execute a read-only SQL query for the user's question."""
-    # TODO(testing): Add API tests for validation, SQL rejection, provider failures, and success responses.
-    # TODO(security): Add authentication and rate limiting before exposing this beyond localhost.
-    # TODO(security): Restrict generated queries to an approved table and column allowlist.
+async def generate_and_execute_query(request: QueryRequest):
     if not os.environ.get("OPENAI_API_KEY"):
-        # Fail early with a clear configuration error instead of making a model
-        # call that cannot succeed.
-        raise HTTPException(
-            status_code=500,
-            detail="OpenAI API Key configuration missing on server.",
-        )
+        raise HTTPException(status_code=500, detail="OpenAI API Key configuration missing on server.")
 
     try:
-        # Read the schema so the model can reference real tables and columns.
         db = SQLDatabase.from_uri(f"sqlite:///{DB_PATH}")
         db_schema = db.get_table_info()
+        
         llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
-
-        # This prompt is the contract with the model: return one SELECT statement
-        # and no explanatory markdown.
-        system_instructions = f"""
+        
+        # --- PHASE 1: Text-to-SQL Conversion ---
+        sql_generation_prompt = f"""
         You are a strict, expert SQLite data analyst. 
         Translate the user's question into a clean, syntactically correct SQLite query.
         
@@ -100,31 +93,47 @@ def generate_and_execute_query(request: QueryRequest):
         {db_schema}
         
         RULES:
-        1. Output ONLY the raw SQL query. Do NOT wrap it in markdown code blocks like ```sql.
+        1. Output ONLY the raw SQL query. Do NOT wrap it in markdown code blocks.
         2. Only pull columns that exist in the schema.
-        3. CRITICAL: If your query accesses the 'usgs_groundwater_wells' table, you MUST always include the 'Latitude' and 'Longitude' columns in your SELECT statement, even if the user does not explicitly mention them.
+        3. CRITICAL: If your query accesses the 'usgs_groundwater_wells' table, you MUST always include the 'Latitude', 'Longitude', and 'Last_Observed' columns in your SELECT statement, even if the user does not explicitly ask for them.
         
         User Question: {request.prompt}
         SQL Query:
         """
-
-
-        ai_response = llm.invoke(system_instructions)
-        # The message object's content is the model's text. Strip whitespace
-        # before passing it to the SQL guard.
-        generated_sql = str(ai_response.content).strip()
+        
+        ai_sql_response = llm.invoke(sql_generation_prompt)
+        generated_sql = ai_sql_response.content.strip()
+        
+        # Execute the query against your local SQLite instance
         data_records = execute_sqlite_query(generated_sql)
-
-        # Returning SQL as well as rows keeps the response inspectable during
-        # development and hides LangChain objects from the frontend contract.
+        
+        # --- PHASE 2: Conversational Interpretation Synthesis ---
+        summary_prompt = f"""
+        You are a helpful, expert environmental and public health data analyst. 
+        Review the following raw dataset extracted from the database and write a concise, conversational 2-3 sentence summary explaining the findings to the user.
+        
+        User's Original Question: {request.prompt}
+        SQL Query Used: {generated_sql}
+        Retrieved Data Rows: {data_records}
+        
+        Provide a smart summary highlighting any anomalies, patterns, or key counts. Keep it professional yet direct.
+        Summary Response:
+        """
+        
+        # If no records were found, pass a simpler instruction
+        if not data_records:
+            summary_text = "No records matching your specific criteria were found in the local database."
+        else:
+            ai_summary_response = llm.invoke(summary_prompt)
+            summary_text = ai_summary_response.content.strip()
+        
+        # --- PHASE 3: Return Expanded Payload ---
         return {
             "status": "success",
             "sql_executed": generated_sql,
             "data": data_records,
+            "ai_interpretation": summary_text  # Added new key
         }
-    except HTTPException:
-        # Preserve deliberate errors from validation and database code.
-        raise
-    except Exception as exc:
-        # TODO(operations): Log the exception server-side and hide its details in production.
-        raise HTTPException(status_code=502, detail=f"AI data engine failure: {exc}") from exc
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI Data Engine Exception: {str(e)}")

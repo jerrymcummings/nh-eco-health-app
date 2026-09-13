@@ -1,3 +1,6 @@
+
+# ßuv run streamlit run src/frontend/app.py
+
 import os
 from dotenv import load_dotenv
 import streamlit as st
@@ -82,7 +85,7 @@ if user_prompt:
                                 lat="Latitude",
                                 lon="Longitude",
                                 hover_name="Site_Name",
-                                hover_data=["Aquifer_Type", "Depth_To_Water_BMSL_Ft"],
+                                hover_data=["Aquifer_Type", "Depth_To_Water_BMSL_Ft", "Last_Observed"],
                                 color="Status",
                                 color_discrete_map={
                                     "Normal": "#2ecc71",
@@ -121,7 +124,11 @@ if user_prompt:
                                 color=target_x if target_x in df_results.columns else None
                             )
                             st.plotly_chart(fig, width="stretch")
-                   
+
+                    if "ai_interpretation" in result_json:
+                        st.markdown("### 🧠 AI Analysis & Insights")
+                        st.success(result_json["ai_interpretation"])
+
                     # Show the generated query details at the bottom
                     st.markdown("---")
                     st.markdown("### Query Details")
