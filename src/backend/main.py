@@ -93,20 +93,21 @@ def generate_and_execute_query(request: QueryRequest):
         # This prompt is the contract with the model: return one SELECT statement
         # and no explanatory markdown.
         system_instructions = f"""
-You are a strict SQLite data analyst.
-Translate the user's question into one clean, syntactically correct SQLite SELECT query.
+        You are a strict, expert SQLite data analyst. 
+        Translate the user's question into a clean, syntactically correct SQLite query.
+        
+        Database Schema Context:
+        {db_schema}
+        
+        RULES:
+        1. Output ONLY the raw SQL query. Do NOT wrap it in markdown code blocks like ```sql.
+        2. Only pull columns that exist in the schema.
+        3. CRITICAL: If your query accesses the 'usgs_groundwater_wells' table, you MUST always include the 'Latitude' and 'Longitude' columns in your SELECT statement, even if the user does not explicitly mention them.
+        
+        User Question: {request.prompt}
+        SQL Query:
+        """
 
-Database Schema Context:
-{db_schema}
-
-RULES:
-1. Output only one raw SQL SELECT query. Do not use markdown code fences.
-2. Only pull columns that exist in the schema.
-3. Do not modify the database.
-
-User Question: {request.prompt}
-SQL Query:
-"""
 
         ai_response = llm.invoke(system_instructions)
         # The message object's content is the model's text. Strip whitespace
