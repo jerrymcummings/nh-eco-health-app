@@ -79,7 +79,16 @@ if user_prompt:
                         if "Latitude" in df_results.columns and "Longitude" in df_results.columns:
                             st.subheader("🗺️ Hydrological Spatial Map")
                             
-                            # Streamlined Plotly Map engine with explicit New England centering
+                            # 🎯 DYNAMIC CENTROID LOGIC: Find the exact midpoint of your filtered data footprint
+                            # This naturally groups the viewport tightly around whichever wells match the query
+                            avg_lat = df_results["Latitude"].mean()
+                            avg_lon = df_results["Longitude"].mean()
+                            
+                            # Calculate an intelligent zoom baseline: if inspecting a single well, zoom in close (10), 
+                            # if inspecting a whole state subset, zoom out to capture the network range (5.5)
+                            dynamic_zoom = 9.5 if len(df_results) == 1 else 5.5
+                            
+                            # Streamlined Plotly Map engine using your dynamic coordinates
                             fig_map = px.scatter_map(
                                 df_results,
                                 lat="Latitude",
@@ -92,12 +101,10 @@ if user_prompt:
                                     "Low / Mild Drought": "#f39c12",
                                     "Critical Low": "#e74c3c"
                                 },
-                                zoom=6,
-                                # ADD THIS PARAMETER: Force center coordinates to Loudon, New Hampshire region
-                                center={"lat": 43.286, "lon": -71.463},
+                                zoom=dynamic_zoom,
+                                center={"lat": avg_lat, "lon": avg_lon},
                                 title="Active Well Aquifer Status Check"
                             )
-
                             
                             # Style the map to open-source OpenStreetMap base layouts
                             fig_map.update_layout(
