@@ -841,9 +841,10 @@ wheels = [
 [[package]]
 name = "nh-eco-health-app"
 version = "0.1.0"
-source = { editable = "." }
+source = { virtual = "." }
 dependencies = [
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "langchain-community" },
     { name = "langchain-openai" },
     { name = "pandas" },
@@ -856,6 +857,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.141.1" },
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "langchain-community", specifier = ">=0.4.2" },
     { name = "langchain-openai", specifier = ">=1.6.2" },
     { name = "pandas", specifier = ">=3.0.5" },
